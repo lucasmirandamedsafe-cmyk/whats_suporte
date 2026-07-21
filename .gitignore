@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+
+# Banco de dados e artefatos derivados - contem dado pessoal real (CPF, nome,
+# telefone) dos exports de WhatsApp processados. Regeneraveis via
+# pipeline/sync_data.py + pipeline/embeddings.py.
+data/*.db
+data/*.db-*
+data/*.db.bak-*
+data/tfidf_model.json
+
+# Exports brutos do WhatsApp (grupos e suporte 1:1), em qualquer subpasta -
+# contem CPF/nome/telefone reais de beneficiarios e equipe do programa.
+raw/**/*.txt
+raw/**/*.zip
+
+reports/output/*.pdf
+scraper/browser_profile/
+scraper/progress.json
