@@ -23,6 +23,14 @@ def load_customer_messages(conn) -> pd.DataFrame:
     )
 
 
+def load_all_messages(conn) -> pd.DataFrame:
+    """Todas as mensagens do suporte 1:1 (cliente + suporte, incluindo midia) -
+    usado pra medir volume de trafego trocado, nao classificacao."""
+    return pd.read_sql_query(
+        "SELECT * FROM messages", conn, parse_dates=["timestamp", "analyzed_at"]
+    )
+
+
 def kpis_reclamacao_suporte(df_msgs: pd.DataFrame) -> dict:
     total = len(df_msgs)
     reclamacoes = int((df_msgs["is_issue"] == 1).sum()) if total else 0
@@ -49,6 +57,7 @@ def kpis(df: pd.DataFrame) -> dict:
     tempo_resposta = df["first_response_seconds"].dropna()
     return {
         "total_sessoes": total_sessoes,
+        "total_conversas": int(df["conversation_id"].nunique()) if total_sessoes else 0,
         "tempo_resposta_medio_min": round(tempo_resposta.mean() / 60, 1) if not tempo_resposta.empty else None,
         "tempo_resposta_mediano_min": round(tempo_resposta.median() / 60, 1) if not tempo_resposta.empty else None,
         "pct_reclamacao": round((df["categoria"] == "reclamacao").mean() * 100, 1) if total_sessoes else 0,
@@ -77,6 +86,22 @@ def volume_atendimentos_por_periodo(df: pd.DataFrame, granularidade: str = "dia"
     return out.groupby("periodo").size().reset_index(name="conversas")
 
 
+def volume_mensagens_por_periodo(df_mensagens: pd.DataFrame, granularidade: str = "dia") -> pd.DataFrame:
+    """Quantidade de mensagens trocadas (cliente + suporte) por periodo -
+    mesmo agrupamento de volume_atendimentos_por_periodo, so que contando
+    mensagens em vez de sessoes, pra sobrepor como linha no mesmo grafico."""
+    out = df_mensagens.dropna(subset=["timestamp"]).copy()
+    if out.empty:
+        return out.assign(periodo=pd.Series(dtype="object"), mensagens=pd.Series(dtype=int))
+    if granularidade == "semana":
+        out["periodo"] = out["timestamp"].dt.to_period("W").dt.start_time.dt.date
+    elif granularidade == "mes":
+        out["periodo"] = out["timestamp"].dt.to_period("M").dt.start_time.dt.date
+    else:
+        out["periodo"] = out["timestamp"].dt.date
+    return out.groupby("periodo").size().reset_index(name="mensagens")
+
+
 def volume_por_hora(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["hora"] = out["started_at"].dt.hour
@@ -89,8 +114,8 @@ _DIAS_SEMANA_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", 
 
 _FAIXA_FORA_HORARIO = "Fora do horário"
 
-# 06h-20h agrupado de 2 em 2 horas; fora disso (20h-06h) tudo em 1 faixa so.
-_FAIXAS_HORA_COMERCIAIS = [(6, 8), (8, 10), (10, 12), (12, 14), (14, 16), (16, 18), (18, 20)]
+# 06h-18h agrupado de 2 em 2 horas; fora disso (18h-06h) tudo em 1 faixa so.
+_FAIXAS_HORA_COMERCIAIS = [(6, 8), (8, 10), (10, 12), (12, 14), (14, 16), (16, 18)]
 _FAIXAS_HORA_ORDEM = [_FAIXA_FORA_HORARIO] + [f"{ini:02d}h–{fim:02d}h" for ini, fim in _FAIXAS_HORA_COMERCIAIS]
 
 
@@ -107,8 +132,8 @@ def _faixa_hora(hora: int) -> str:
 
 def volume_por_dia_semana_hora(df: pd.DataFrame) -> pd.DataFrame:
     """Heatmap de volume de atendimentos por dia da semana x faixa de horario -
-    06h-20h agrupado de 2 em 2 horas, fora disso (20h-06h) tudo em 1 faixa so.
-    Sempre devolve as 7x8 combinacoes (fill 0 onde nao houve atendimento)."""
+    06h-18h agrupado de 2 em 2 horas, fora disso (18h-06h) tudo em 1 faixa so.
+    Sempre devolve as 7x7 combinacoes (fill 0 onde nao houve atendimento)."""
     out = df.dropna(subset=["started_at"]).copy()
     if out.empty:
         return pd.DataFrame(columns=["dia_semana", "faixa_hora", "conversas"])
@@ -158,12 +183,45 @@ def pico_simultaneos_por_periodo(df: pd.DataFrame, granularidade: str = "dia") -
     )
 
 
+_HORAS_EXPEDIENTE_POR_DIA = 8  # jornada de trabalho padrao (8h/dia)
+
+
 def media_atendimentos_por_hora(df: pd.DataFrame) -> float:
-    """Media de atendimentos iniciados por hora do dia - total de atendimentos
-    dividido por 24 (mesma base da distribuicao usada em volume_por_hora)."""
+    """Media de atendimentos por hora de expediente - desconsidera fins de
+    semana (sabado/domingo) tanto no numerador (atendimentos) quanto no
+    denominador (dias). Total de atendimentos em dias uteis dividido pelas
+    horas de expediente disponiveis (8h/dia, jornada padrao) somadas so nos
+    dias uteis que TIVERAM pelo menos 1 atendimento (nao no span de
+    calendario inteiro, que incluiria dias sem nenhum atendimento e
+    distorceria a media pra baixo)."""
     if df.empty:
         return 0.0
-    return round(len(df) / 24, 1)
+    dias_uteis = df[df["started_at"].dt.dayofweek < 5]  # Seg=0 .. Sex=4, exclui Sab/Dom
+    if dias_uteis.empty:
+        return 0.0
+    dias_com_atendimento = dias_uteis["started_at"].dt.date.nunique()
+    horas_disponiveis = dias_com_atendimento * _HORAS_EXPEDIENTE_POR_DIA
+    if horas_disponiveis <= 0:
+        return 0.0
+    return round(len(dias_uteis) / horas_disponiveis, 2)
+
+
+def media_mensagens_por_hora(df_mensagens: pd.DataFrame) -> float:
+    """Mesma regra de media_atendimentos_por_hora, so que contando mensagens
+    trocadas (cliente + suporte) em vez de sessoes: desconsidera fins de
+    semana no numerador e no denominador, dividindo pelas horas de
+    expediente (8h/dia) somadas so nos dias uteis que tiveram pelo menos 1
+    mensagem."""
+    if df_mensagens.empty:
+        return 0.0
+    dias_uteis = df_mensagens[df_mensagens["timestamp"].dt.dayofweek < 5]
+    if dias_uteis.empty:
+        return 0.0
+    dias_com_mensagem = dias_uteis["timestamp"].dt.date.nunique()
+    horas_disponiveis = dias_com_mensagem * _HORAS_EXPEDIENTE_POR_DIA
+    if horas_disponiveis <= 0:
+        return 0.0
+    return round(len(dias_uteis) / horas_disponiveis, 2)
 
 
 _PALAVRAS_PROBLEMA = [

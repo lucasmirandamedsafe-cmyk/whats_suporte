@@ -19,12 +19,15 @@ from pipeline.metrics import (
     distribuicao_tipo_suporte,
     kpis,
     kpis_grupos,
+    load_all_messages,
     load_customer_messages,
     load_group_messages,
     load_sessions,
     media_atendimentos_por_hora,
+    media_mensagens_por_hora,
     pico_simultaneos_por_periodo,
     volume_atendimentos_por_periodo,
+    volume_mensagens_por_periodo,
     volume_por_dia_semana_hora,
     volume_problemas_por_area,
     volume_problemas_por_periodo,
@@ -67,12 +70,18 @@ def suporte_dashboard(
         df_sessions = load_sessions(conn)
         msgs_cliente = load_customer_messages(conn)
         clareza = demandas_pouco_claras(conn)
+        todas_msgs = load_all_messages(conn)
 
     filtered = apply_suporte_filters(df_sessions, msgs_cliente, clareza, start, end, categoria, tipo_erro)
     df = filtered["df"]
     msgs_filtradas = filtered["msgs_filtradas"]
     reclamacoes_filtradas = filtered["reclamacoes_filtradas"]
     pct_pouco_clara = filtered["pct_pouco_clara"]
+
+    # Mensagens (cliente + suporte) das sessoes filtradas - pra sobrepor como
+    # linha no grafico "Volume de atendimentos".
+    sessoes_no_filtro = set(df["session_id"])
+    msgs_das_sessoes_filtradas = todas_msgs[todas_msgs["session_id"].isin(sessoes_no_filtro)]
 
     if df.empty:
         pico_atual = 0
@@ -81,6 +90,7 @@ def suporte_dashboard(
         pico_atual = int(pico_serie.max()) if not pico_serie.empty else 0
 
     media_por_hora = media_atendimentos_por_hora(df)
+    media_msgs_por_hora = media_mensagens_por_hora(msgs_das_sessoes_filtradas)
 
     k = kpis(df)
     tempo_medio = k["tempo_resposta_medio_min"]
@@ -98,6 +108,8 @@ def suporte_dashboard(
     return {
         "kpis": {
             "total_sessoes": k["total_sessoes"],
+            "total_conversas": k["total_conversas"],
+            "total_conversas_display": str(k["total_conversas"]),
             "tempo_resposta_medio_min": tempo_medio,
             "tempo_resposta_medio_min_display": f"{tempo_medio} min" if tempo_medio is not None else "—",
             "tempo_resposta_mediano_min": k["tempo_resposta_mediano_min"],
@@ -106,6 +118,8 @@ def suporte_dashboard(
             "pico_simultaneos": pico_atual,
             "media_por_hora": media_por_hora,
             "media_por_hora_display": f"{media_por_hora}",
+            "media_msgs_por_hora": media_msgs_por_hora,
+            "media_msgs_por_hora_display": f"{media_msgs_por_hora}",
             "pct_pouco_clara": pct_pouco_clara,
             "pct_pouco_clara_display": f"{pct_pouco_clara}%",
         },
@@ -119,6 +133,11 @@ def suporte_dashboard(
             "dia": df_to_records(volume_atendimentos_por_periodo(df, "dia")),
             "semana": df_to_records(volume_atendimentos_por_periodo(df, "semana")),
             "mes": df_to_records(volume_atendimentos_por_periodo(df, "mes")),
+        },
+        "volume_mensagens": {
+            "dia": df_to_records(volume_mensagens_por_periodo(msgs_das_sessoes_filtradas, "dia")),
+            "semana": df_to_records(volume_mensagens_por_periodo(msgs_das_sessoes_filtradas, "semana")),
+            "mes": df_to_records(volume_mensagens_por_periodo(msgs_das_sessoes_filtradas, "mes")),
         },
         "volume_por_dia_semana_hora": df_to_records(volume_por_dia_semana_hora(df)),
         "atendimentos_simultaneos": {
@@ -134,6 +153,10 @@ def suporte_dashboard(
         "atendimentos": df_to_records(
             df[["started_at", "conversation_id", "categoria", "tema", "resumo", "first_response_seconds"]]
             .sort_values("started_at", ascending=False)
+        ),
+        "aviso_amostra": (
+            f"Os dados exibidos sao baseados em {k['total_conversas']} conversa(s) distinta(s) "
+            f"({k['total_sessoes']} atendimento(s)) no periodo/filtro selecionado."
         ),
     }
 

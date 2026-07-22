@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 import { BarChartCard } from "@/components/charts/BarChartCard";
+import { BarLineChartCard } from "@/components/charts/BarLineChartCard";
 import { HeatmapCard } from "@/components/charts/HeatmapCard";
 import { HorizontalBarChartCard } from "@/components/charts/HorizontalBarChartCard";
 import { CATEGORICAL } from "@/components/charts/chartTheme";
@@ -19,7 +20,7 @@ import { useSuporteDashboard } from "@/hooks/useSuporteDashboard";
 import { useSuporteFiltros } from "@/hooks/useSuporteFiltros";
 import { formatDateTime, formatSeconds } from "@/lib/formatters";
 import { CATEGORIA_ATENDIMENTO_LABELS, CATEGORIA_ERRO_LABELS, TIPO_ERRO_LABELS, translateLabel } from "@/lib/labels";
-import type { Granularidade, SuporteFiltrosState } from "@/lib/types";
+import type { Granularidade, PeriodoConversas, PeriodoMensagens, SuporteFiltrosState } from "@/lib/types";
 
 // Mesma ordem canonica de pipeline/metrics.py::volume_por_dia_semana_hora
 // (_DIAS_SEMANA_PT / _FAIXAS_HORA_ORDEM) - o backend sempre devolve as 7x8
@@ -33,8 +34,29 @@ const FAIXAS_HORA_ORDEM = [
   "12h–14h",
   "14h–16h",
   "16h–18h",
-  "18h–20h",
 ];
+
+interface VolumeCombinado {
+  periodo: string;
+  conversas: number;
+  mensagens: number;
+}
+
+// Junta as duas series (atendimentos e mensagens) por periodo - vem de duas
+// queries separadas no backend (sessoes x mensagens), entao mesclamos aqui
+// so pra desenhar no mesmo grafico, sem nenhum calculo alem do merge.
+function mesclarVolume(atendimentos: PeriodoConversas[], mensagens: PeriodoMensagens[]): VolumeCombinado[] {
+  const porPeriodo = new Map<string, VolumeCombinado>();
+  for (const r of atendimentos) {
+    porPeriodo.set(r.periodo, { periodo: r.periodo, conversas: r.conversas, mensagens: 0 });
+  }
+  for (const r of mensagens) {
+    const existente = porPeriodo.get(r.periodo);
+    if (existente) existente.mensagens = r.mensagens;
+    else porPeriodo.set(r.periodo, { periodo: r.periodo, conversas: 0, mensagens: r.mensagens });
+  }
+  return Array.from(porPeriodo.values()).sort((a, b) => a.periodo.localeCompare(b.periodo));
+}
 
 export default function SuportePage() {
   const { data: filtrosOut, loading: loadingFiltros } = useSuporteFiltros();
@@ -57,9 +79,30 @@ export default function SuportePage() {
     mensagens: r.mensagens,
   }));
 
+  const volumeCombinado = data
+    ? mesclarVolume(data.volume_atendimentos[granularidade], data.volume_mensagens[granularidade])
+    : [];
+
+  const paramsRelatorio = new URLSearchParams();
+  if (filters.start) paramsRelatorio.set("start", filters.start);
+  if (filters.end) paramsRelatorio.set("end", filters.end);
+  if (filters.categoria) paramsRelatorio.set("categoria", filters.categoria);
+  if (filters.tipoErro) paramsRelatorio.set("tipo_erro", filters.tipoErro);
+  const hrefRelatorio = `/api/suporte/relatorio-pdf?${paramsRelatorio.toString()}`;
+
   return (
     <div>
-      <PageHeader title="Suporte WhatsApp" />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader title="Suporte WhatsApp" />
+        {data ? (
+          <a
+            href={hrefRelatorio}
+            className="shrink-0 rounded-md border border-[#e1e0d9] bg-white px-4 py-2 text-sm font-medium text-[#0b0b0b] hover:bg-[#f5f4f0]"
+          >
+            Exportar PDF
+          </a>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap gap-4 mb-6 rounded-lg border border-[#e1e0d9] bg-white p-4">
         <DateRangePicker
@@ -94,14 +137,24 @@ export default function SuportePage() {
         <>
           <KpiRow>
             <KpiCard
+              label="Conversas na base"
+              value={data.kpis.total_conversas_display}
+              help="Quantidade de conversas (números/contatos) distintos por trás dos atendimentos do período filtrado. Uma mesma conversa pode gerar mais de 1 atendimento."
+            />
+            <KpiCard
               label="Atendimentos"
               value={data.kpis.total_sessoes}
               help="Total de sessões de atendimento no período filtrado. Cada sessão agrupa as mensagens de uma mesma conversa com até 6h de intervalo entre elas."
             />
             <KpiCard
-              label="Tempo médio de resposta"
-              value={data.kpis.tempo_resposta_medio_min_display}
-              help="Tempo médio entre a 1ª mensagem do cliente e a 1ª resposta do suporte, por atendimento."
+              label="Média de atendimentos por hora"
+              value={data.kpis.media_por_hora_display}
+              help="Desconsidera fins de semana. Total de atendimentos em dias úteis dividido pelas horas de expediente disponíveis (8h/dia) somadas só nos dias úteis que tiveram pelo menos 1 atendimento."
+            />
+            <KpiCard
+              label="Média de mensagens por hora"
+              value={data.kpis.media_msgs_por_hora_display}
+              help="Mesma regra da média de atendimentos por hora, só que contando mensagens trocadas (cliente + suporte). Desconsidera fins de semana; divide pelas horas de expediente (8h/dia) somadas só nos dias úteis com pelo menos 1 mensagem."
             />
             <KpiCard
               label="Pico de atendimentos simultâneos"
@@ -109,9 +162,9 @@ export default function SuportePage() {
               help="Maior número de atendimentos abertos ao mesmo tempo em um único instante, dentro do período filtrado."
             />
             <KpiCard
-              label="Média de atendimentos por hora"
-              value={data.kpis.media_por_hora_display}
-              help="Total de atendimentos dividido por 24 - média de quantos atendimentos começam em cada hora do dia."
+              label="Tempo médio de resposta"
+              value={data.kpis.tempo_resposta_medio_min_display}
+              help="Tempo médio entre a 1ª mensagem do cliente e a 1ª resposta do suporte, por atendimento."
             />
             <KpiCard
               label="% Demanda pouco clara"
@@ -125,6 +178,10 @@ export default function SuportePage() {
             />
           </KpiRow>
 
+          <div className="mb-6">
+            <InfoNote message={data.aviso_amostra} />
+          </div>
+
           <SectionHeader
             title="Volume de atendimentos"
             right={<GranularidadeToggle value={granularidade} onChange={setGranularidade} />}
@@ -132,18 +189,23 @@ export default function SuportePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 className="text-base font-semibold text-[#0b0b0b] mb-2">Volume de atendimentos</h3>
-              {data.volume_atendimentos[granularidade].length > 0 ? (
-                <BarChartCard
-                  data={data.volume_atendimentos[granularidade]}
+              {volumeCombinado.length > 0 ? (
+                <BarLineChartCard
+                  data={volumeCombinado}
                   xKey="periodo"
-                  yKey="conversas"
-                  color={CATEGORICAL[0]}
+                  barKey="conversas"
+                  lineKey="mensagens"
+                  barColor={CATEGORICAL[0]}
+                  lineColor={CATEGORICAL[5]}
+                  barLabel="Atendimentos"
+                  lineLabel="Mensagens trocadas"
                 />
               ) : (
                 <InfoNote message="Sem atendimentos no período selecionado." />
               )}
               <p className="text-xs text-[#898781] mt-2">
-                Quantos atendimentos começaram em cada período, conforme a granularidade escolhida acima.
+                Barra: atendimentos iniciados em cada período. Linha: total de mensagens trocadas (cliente +
+                suporte) nesses atendimentos, conforme a granularidade escolhida acima.
               </p>
             </div>
             <div>
@@ -176,8 +238,8 @@ export default function SuportePage() {
               color={CATEGORICAL[0]}
             />
             <p className="text-xs text-[#898781] mt-2">
-              % de atendimentos por dia da semana e faixa de horário. 06h–20h agrupado de 2 em 2 horas; fora
-              desse intervalo (20h–06h) tudo em uma faixa só.
+              % de atendimentos por dia da semana e faixa de horário. 06h–18h agrupado de 2 em 2 horas; fora
+              desse intervalo (18h–06h) tudo em uma faixa só.
             </p>
           </div>
 
@@ -235,13 +297,7 @@ export default function SuportePage() {
             columns={[
               { key: "started_at", header: "Início", render: (v) => formatDateTime(v as string) },
               { key: "conversation_id", header: "Conversa" },
-              {
-                key: "categoria",
-                header: "Categoria",
-                render: (v) => translateLabel(v as string | null, CATEGORIA_ATENDIMENTO_LABELS),
-              },
               { key: "tema", header: "Tema" },
-              { key: "resumo", header: "Resumo" },
               {
                 key: "first_response_seconds",
                 header: "Tempo de resposta",

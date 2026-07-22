@@ -8,6 +8,7 @@ Uso:
     python -m api.cli suporte-filtros
     python -m api.cli suporte-dashboard --start 2026-01-01 --end 2026-02-01 \
         --categoria reclamacao --tipo-erro acesso_login
+    python -m api.cli suporte-relatorio-pdf --start ... --end ... (imprime bytes do PDF no stdout)
     python -m api.cli grupos-filtros
     python -m api.cli grupos-dashboard --areas saude --areas educacao --start ... --end ...
 """
@@ -17,10 +18,14 @@ import sys
 from datetime import date
 from pathlib import Path
 
-sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# So afeta o stream de TEXTO (sys.stdout.write) - o comando suporte-relatorio-pdf
+# escreve bytes crus em sys.stdout.buffer, que nao passa por essa camada.
+sys.stdout.reconfigure(encoding="utf-8")
+
 from api.dashboard_data import grupos_dashboard, grupos_filtros, suporte_dashboard, suporte_filtros
+from reports.generate import build_suporte_report
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -38,6 +43,12 @@ def main(argv: list[str] | None = None) -> None:
     p_suporte.add_argument("--end")
     p_suporte.add_argument("--categoria")
     p_suporte.add_argument("--tipo-erro")
+
+    p_relatorio = subparsers.add_parser("suporte-relatorio-pdf")
+    p_relatorio.add_argument("--start")
+    p_relatorio.add_argument("--end")
+    p_relatorio.add_argument("--categoria")
+    p_relatorio.add_argument("--tipo-erro")
 
     subparsers.add_parser("grupos-filtros")
 
@@ -57,6 +68,15 @@ def main(argv: list[str] | None = None) -> None:
             categoria=args.categoria or None,
             tipo_erro=args.tipo_erro or None,
         )
+    elif args.command == "suporte-relatorio-pdf":
+        pdf_bytes = build_suporte_report(
+            start=_parse_date(args.start),
+            end=_parse_date(args.end),
+            categoria=args.categoria or None,
+            tipo_erro=args.tipo_erro or None,
+        )
+        sys.stdout.buffer.write(pdf_bytes)
+        return
     elif args.command == "grupos-filtros":
         result = grupos_filtros()
     elif args.command == "grupos-dashboard":

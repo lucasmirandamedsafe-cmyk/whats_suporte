@@ -1,5 +1,6 @@
 groq
 google-genai
+httpx
 pandas
 numpy
 python-dotenv

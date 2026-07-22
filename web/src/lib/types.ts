@@ -35,6 +35,11 @@ export interface PeriodoPico {
   pico_simultaneos: number;
 }
 
+export interface PeriodoMensagens {
+  periodo: string;
+  mensagens: number;
+}
+
 export interface TipoMensagens {
   tipo: string;
   mensagens: number;
@@ -60,6 +65,8 @@ export interface Atendimento {
 export interface SuporteDashboardOut {
   kpis: {
     total_sessoes: number;
+    total_conversas: number;
+    total_conversas_display: string;
     tempo_resposta_medio_min: number | null;
     tempo_resposta_medio_min_display: string;
     tempo_resposta_mediano_min: number | null;
@@ -68,6 +75,8 @@ export interface SuporteDashboardOut {
     pico_simultaneos: number;
     media_por_hora: number;
     media_por_hora_display: string;
+    media_msgs_por_hora: number;
+    media_msgs_por_hora_display: string;
     pct_pouco_clara: number;
     pct_pouco_clara_display: string;
   };
@@ -78,11 +87,13 @@ export interface SuporteDashboardOut {
     pct_reclamacoes_display: string;
   };
   volume_atendimentos: Record<Granularidade, PeriodoConversas[]>;
+  volume_mensagens: Record<Granularidade, PeriodoMensagens[]>;
   volume_por_dia_semana_hora: CelulaVolumeDiaSemanaHora[];
   atendimentos_simultaneos: Record<Granularidade, PeriodoPico[]>;
   distribuicao_tipo_erro: TipoMensagens[];
   mensagens_reclamacao: MensagemReclamacao[];
   atendimentos: Atendimento[];
+  aviso_amostra: string;
 }
 
 export interface GruposFiltrosOut {

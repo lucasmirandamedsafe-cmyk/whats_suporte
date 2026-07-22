@@ -24,6 +24,20 @@ export async function runPythonCli<T>(command: string, args: string[] = []): Pro
   return JSON.parse(stdout) as T;
 }
 
+/**
+ * Como runPythonCli, mas para comandos que imprimem bytes binarios no stdout
+ * (ex: suporte-relatorio-pdf) em vez de JSON - usa encoding "buffer" pra nao
+ * corromper os bytes passando por decodificacao de texto.
+ */
+export async function runPythonCliBinary(command: string, args: string[] = []): Promise<Buffer> {
+  const { stdout } = await execFileAsync("python", ["-m", "api.cli", command, ...args], {
+    cwd: REPO_ROOT,
+    encoding: "buffer",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  return stdout;
+}
+
 export function appendParam(args: string[], flag: string, value: string | string[] | null | undefined) {
   if (value === null || value === undefined || value === "") return;
   if (Array.isArray(value)) {

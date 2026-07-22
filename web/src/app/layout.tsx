@@ -13,7 +13,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="pt-BR">
       <body className="min-h-screen bg-[#fcfcfb] text-[#0b0b0b] antialiased">
         <TopNav />
-        <main className="p-6 max-w-[1400px] mx-auto">{children}</main>
+        <main className="p-6">{children}</main>
       </body>
     </html>
   );
