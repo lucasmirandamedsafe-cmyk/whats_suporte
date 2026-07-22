@@ -18,6 +18,7 @@ import { DataTable } from "@/components/tables/DataTable";
 import { useGruposDashboard } from "@/hooks/useGruposDashboard";
 import { useGruposFiltros } from "@/hooks/useGruposFiltros";
 import { formatDateTime } from "@/lib/formatters";
+import { AREA_LABELS, CATEGORIA_ERRO_LABELS, TIPO_ERRO_LABELS, translateLabel } from "@/lib/labels";
 import type { Granularidade, GruposFiltrosState } from "@/lib/types";
 
 export default function GruposPage() {
@@ -43,6 +44,19 @@ export default function GruposPage() {
 
   const mensagensExibidas = data ? (apenasProblemas ? data.mensagens.filter((m) => m.is_issue === 1) : data.mensagens) : [];
 
+  const volumePorAreaChartData = data?.volume_por_area.map((r) => ({
+    area: translateLabel(r.area, AREA_LABELS),
+    problemas: r.problemas,
+  }));
+  const distribuicaoCategoriaChartData = data?.distribuicao_categoria.map((r) => ({
+    categoria: translateLabel(r.categoria, CATEGORIA_ERRO_LABELS),
+    incidentes: r.incidentes,
+  }));
+  const tipoErroChartData = data?.distribuicao_tipo_erro.map((r) => ({
+    tipo: translateLabel(r.tipo, TIPO_ERRO_LABELS),
+    incidentes: r.incidentes,
+  }));
+
   return (
     <div>
       <PageHeader
@@ -56,6 +70,7 @@ export default function GruposPage() {
           options={filtrosOut.areas}
           values={areasEfetivas}
           onChange={(areas) => setFilters((f) => ({ ...f, areas }))}
+          labels={AREA_LABELS}
         />
         <DateRangePicker
           start={filters.start}
@@ -79,46 +94,65 @@ export default function GruposPage() {
       ) : (
         <>
           <KpiRow>
-            <KpiCard label="Mensagens analisadas" value={data.kpis.total_mensagens} />
-            <KpiCard label="Reclamações/erros identificados" value={data.kpis.total_problemas} />
-            <KpiCard label="% do total" value={data.kpis.pct_problemas_display} />
-            <KpiCard label="% erro de app" value={data.kpis.pct_erro_app_display} />
+            <KpiCard
+              label="Mensagens analisadas"
+              value={data.kpis.total_mensagens}
+              help="Total de mensagens de grupo (sem contar mídia) no filtro de área/período selecionado."
+            />
+            <KpiCard
+              label="Reclamações/erros identificados"
+              value={data.kpis.total_problemas}
+              help="Incidentes únicos: mensagens da mesma conversa, mesmo tipo de erro e mesmo dia são agrupadas em 1, para não contar cada resposta da thread como um problema novo."
+            />
+            <KpiCard
+              label="% do total"
+              value={data.kpis.pct_problemas_display}
+              help="Incidentes únicos dividido pelo total de mensagens analisadas."
+            />
+            <KpiCard
+              label="% erro de app"
+              value={data.kpis.pct_erro_app_display}
+              help="Proporção de incidentes classificados como erro técnico do aplicativo (em vez de processo administrativo)."
+            />
           </KpiRow>
-          <p className="text-xs text-[#898781] mb-6">
-            Reclamações/erros contam incidentes únicos (mensagens da mesma conversa, mesmo tipo e mesmo dia são
-            agrupadas em 1), não cada mensagem individual.
-          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h2 className="text-lg font-semibold text-[#0b0b0b] mb-2">Problemas por área</h2>
-              <BarChartCard data={data.volume_por_area} xKey="area" yKey="problemas" color={CATEGORICAL[0]} />
+              <BarChartCard data={volumePorAreaChartData ?? []} xKey="area" yKey="problemas" color={CATEGORICAL[0]} />
+              <p className="text-xs text-[#898781] mt-2">
+                Quantos incidentes únicos foram identificados em cada área.
+              </p>
             </div>
             <div>
               <h2 className="text-lg font-semibold text-[#0b0b0b] mb-2">Distribuição por categoria</h2>
               <BarChartCard
-                data={data.distribuicao_categoria}
+                data={distribuicaoCategoriaChartData ?? []}
                 xKey="categoria"
                 yKey="incidentes"
                 color={CATEGORICAL[1]}
                 showValueLabels
               />
+              <p className="text-xs text-[#898781] mt-2">
+                Incidentes por categoria: erro no aplicativo vs. processo administrativo.
+              </p>
             </div>
           </div>
 
           <h2 className="text-lg font-semibold text-[#0b0b0b] mb-2">Tipo de erro</h2>
           <div className="mb-6">
-            {data.distribuicao_tipo_erro.length === 0 ? (
+            {!tipoErroChartData || tipoErroChartData.length === 0 ? (
               <InfoNote message="Tipo de erro ainda nao classificado. Rode `python pipeline/classify_tipo_erro.py`." />
             ) : (
               <HorizontalBarChartCard
-                data={data.distribuicao_tipo_erro}
+                data={tipoErroChartData}
                 xKey="incidentes"
                 yKey="tipo"
                 color={CATEGORICAL[2]}
                 showValueLabels
               />
             )}
+            <p className="text-xs text-[#898781] mt-2">Incidentes classificados por tipo específico de problema.</p>
           </div>
 
           <SectionHeader
@@ -136,19 +170,30 @@ export default function GruposPage() {
             ) : (
               <InfoNote message="Nenhum problema no período selecionado." />
             )}
+            <p className="text-xs text-[#898781] mt-2">
+              Quantidade de incidentes por período, conforme a granularidade escolhida acima.
+            </p>
           </div>
 
           <h2 className="text-lg font-semibold text-[#0b0b0b] mb-2">Mensagens</h2>
           <DataTable
             columns={[
-              { key: "timestamp", header: "timestamp", render: (v) => formatDateTime(v as string) },
-              { key: "area", header: "area" },
-              { key: "conversation_id", header: "conversation_id" },
-              { key: "sender", header: "sender" },
-              { key: "issue_categoria", header: "issue_categoria" },
-              { key: "issue_tipo", header: "issue_tipo" },
-              { key: "issue_tema", header: "issue_tema" },
-              { key: "content", header: "content" },
+              { key: "timestamp", header: "Data/hora", render: (v) => formatDateTime(v as string) },
+              { key: "area", header: "Área", render: (v) => translateLabel(v as string | null, AREA_LABELS) },
+              { key: "conversation_id", header: "Conversa" },
+              { key: "sender", header: "Remetente" },
+              {
+                key: "issue_categoria",
+                header: "Categoria de erro",
+                render: (v) => translateLabel(v as string | null, CATEGORIA_ERRO_LABELS),
+              },
+              {
+                key: "issue_tipo",
+                header: "Tipo de erro",
+                render: (v) => translateLabel(v as string | null, TIPO_ERRO_LABELS),
+              },
+              { key: "issue_tema", header: "Tema" },
+              { key: "content", header: "Mensagem" },
             ]}
             rows={mensagensExibidas}
           />

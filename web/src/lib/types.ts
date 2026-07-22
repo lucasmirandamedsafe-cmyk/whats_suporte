@@ -1,5 +1,6 @@
-// Espelha 1:1 o JSON devolvido por api/routers/suporte.py e api/routers/grupos.py.
-// Nao ha calculo nenhum do lado do cliente - so renderizacao do que a API manda.
+// Espelha 1:1 o JSON devolvido por api/dashboard_data.py (via api/cli.py e as
+// rotas web/src/app/api/**). Nao ha calculo nenhum do lado do cliente - so
+// renderizacao do que a API manda.
 
 export type Granularidade = "dia" | "semana" | "mes";
 
@@ -8,7 +9,6 @@ export interface SuporteFiltrosOut {
   min_date: string | null;
   max_date: string | null;
   categorias: string[];
-  categorias_erro: string[];
   tipos_erro: string[];
 }
 
@@ -16,28 +16,23 @@ export interface SuporteFiltrosState {
   start?: string;
   end?: string;
   categoria?: string;
-  categoriaErro?: string;
   tipoErro?: string;
 }
 
-export interface DiaConversas {
-  dia: string;
+export interface PeriodoConversas {
+  periodo: string;
   conversas: number;
 }
 
-export interface HoraConversas {
-  hora: number;
+export interface CelulaVolumeDiaSemanaHora {
+  dia_semana: string;
+  faixa_hora: string;
   conversas: number;
 }
 
 export interface PeriodoPico {
   periodo: string;
   pico_simultaneos: number;
-}
-
-export interface CategoriaMensagens {
-  categoria: string;
-  mensagens: number;
 }
 
 export interface TipoMensagens {
@@ -71,6 +66,8 @@ export interface SuporteDashboardOut {
     pct_reclamacao: number;
     pct_duvida: number;
     pico_simultaneos: number;
+    media_por_hora: number;
+    media_por_hora_display: string;
     pct_pouco_clara: number;
     pct_pouco_clara_display: string;
   };
@@ -80,10 +77,9 @@ export interface SuporteDashboardOut {
     pct_reclamacoes: number;
     pct_reclamacoes_display: string;
   };
-  volume_por_dia: DiaConversas[];
-  volume_por_hora: HoraConversas[];
+  volume_atendimentos: Record<Granularidade, PeriodoConversas[]>;
+  volume_por_dia_semana_hora: CelulaVolumeDiaSemanaHora[];
   atendimentos_simultaneos: Record<Granularidade, PeriodoPico[]>;
-  distribuicao_categoria_erro: CategoriaMensagens[];
   distribuicao_tipo_erro: TipoMensagens[];
   mensagens_reclamacao: MensagemReclamacao[];
   atendimentos: Atendimento[];

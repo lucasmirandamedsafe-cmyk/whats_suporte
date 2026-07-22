@@ -13,8 +13,8 @@ diferentes do dashboard.
 
 | Sinal | Pipeline | Vai para | Pagina do dashboard |
 |---|---|---|---|
-| Conversa 1:1 entre um cidadao e o numero de suporte | `parse.py` -> `enrich_ai.py` | `messages` / `sessions` | `dashboard/app.py` (Suporte WhatsApp) |
-| Grupo de WhatsApp (varias pessoas, coordenacao/supervisoras) | `parse_groups.py` -> `classify_issues.py` -> `classify_tipo_erro.py` | `group_messages` | `dashboard/pages/1_Grupos.py` |
+| Conversa 1:1 entre um cidadao e o numero de suporte | `parse.py` -> `enrich_ai.py` | `messages` / `sessions` | `/suporte` |
+| Grupo de WhatsApp (varias pessoas, coordenacao/supervisoras) | `parse_groups.py` -> `classify_issues.py` -> `classify_tipo_erro.py` | `group_messages` | `/grupos` |
 
 Confira o nome do arquivo exportado (ex: `WhatsApp Chat - <numero de telefone>.zip`
 geralmente e 1:1; `WhatsApp Chat - <nome de grupo>.zip` e grupo) e o conteudo (server
@@ -27,19 +27,26 @@ que pode ser ignorada). Os parsers so leem `.txt` soltos nas pastas certas:
 
 - **Grupo**: extrair o `.txt` direto em `raw/<area>/` (area = `assistencia`, `saude` ou
   `educacao`, conforme `config.py` -> `pipeline/parse_groups.py`).
-- **1:1 suporte**: extrair o `.txt` direto em `raw/suporte/` (definido em
-  `config.RAW_DIR`). **Atencao**: `parse.py` faz `config.RAW_DIR.glob("*.txt")` -
-  isso NAO e recursivo. Se os zips estiverem numa subpasta (ex:
-  `raw/suporte/suporte_assistencia/`), extraia os `.txt` e MOVA pra
-  `raw/suporte/` diretamente, ou o parser nao vai achar nada.
+- **1:1 suporte**: extrair o `.txt` dentro de `raw/suporte/suporte_<area>/` (area =
+  `assistencia`, `saude` ou `educacao`) - **NAO mova pra `raw/suporte/` direto**.
+  `parse.py` faz `config.RAW_DIR.rglob("*.txt")` (recursivo, entao acha arquivos em
+  qualquer subpasta) e deriva a area automaticamente do nome da subpasta via
+  `_area_for()` (`raw/suporte/suporte_saude/x.txt` -> `area="saude"`). Um `.txt` solto
+  direto em `raw/suporte/` (sem subpasta) fica com `area=None` - ja aconteceu (ver
+  `docs/` no historico do projeto) e exigiu um `UPDATE` manual no banco pra corrigir.
+  Se o zip ja estiver numa subpasta `suporte_<area>/`, so extrai o `.txt` **ali dentro
+  mesmo**, sem mover pra fora.
 
-Comando pra extrair todos os zips de uma pasta de uma vez (PowerShell):
+Comando pra extrair todos os zips de uma pasta de uma vez, mantendo a area (PowerShell -
+exemplo pra area "assistencia", ajuste a pasta pra `suporte_saude`/`suporte_educacao`
+conforme o caso):
 ```powershell
 Get-ChildItem "raw/suporte/suporte_assistencia/*.zip" | ForEach-Object {
     Expand-Archive -Path $_.FullName -DestinationPath "raw/suporte/suporte_assistencia/_tmp_extract" -Force
 }
 Get-ChildItem "raw/suporte/suporte_assistencia/_tmp_extract" -Filter *.txt -Recurse |
-    Move-Item -Destination "raw/suporte/"
+    Move-Item -Destination "raw/suporte/suporte_assistencia/"
+Remove-Item "raw/suporte/suporte_assistencia/_tmp_extract" -Recurse -Force
 ```
 Renomeie arquivos duplicados (`_chat.txt` de varias conversas 1:1 tem o mesmo nome) -
 use o nome do zip original como base, ex: `WhatsApp Chat - <numero>.txt`.

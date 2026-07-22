@@ -16,7 +16,6 @@ def apply_suporte_filters(
     start: date | None,
     end: date | None,
     categoria: str | None,
-    categoria_erro: str | None,
     tipo_erro: str | None,
 ) -> dict:
     df = df_sessions
@@ -41,24 +40,21 @@ def apply_suporte_filters(
         round(clareza_filtrada["demanda_pouco_clara"].mean() * 100, 1) if not clareza_filtrada.empty else 0
     )
 
-    # Mensagens do cliente no mesmo recorte de conversas + periodo das sessoes
-    # filtradas - essa e' a base (denominador) do "% msgs com reclamacao",
-    # calculada ANTES de aplicar categoria_erro/tipo_erro.
-    if not df.empty:
-        conversas_no_filtro = set(df["conversation_id"])
-        msgs_filtradas = msgs_cliente[
-            msgs_cliente["conversation_id"].isin(conversas_no_filtro)
-            & (msgs_cliente["timestamp"].dt.date >= df["started_at"].min().date())
-            & (msgs_cliente["timestamp"].dt.date <= df["started_at"].max().date())
-        ]
-    else:
-        msgs_filtradas = msgs_cliente.iloc[0:0]
+    # Mensagens do cliente das sessoes filtradas - essa e' a base (denominador)
+    # do "% msgs com reclamacao", calculada ANTES de aplicar categoria_erro/
+    # tipo_erro. Filtra por session_id exato (nao por conversation_id + janela
+    # de data - isso vazava mensagens de OUTRAS sessoes do mesmo cliente que
+    # caiam dentro do intervalo entre a primeira e a ultima sessao filtrada,
+    # mesmo sem pertencer a elas).
+    sessoes_no_filtro = set(df["session_id"])
+    msgs_filtradas = msgs_cliente[msgs_cliente["session_id"].isin(sessoes_no_filtro)]
 
-    # Categoria de erro / Tipo de erro - filtram SO a secao "Reclamacoes de erro"
-    # (seus proprios KPIs, graficos e tabela), sem encolher total_msgs_cliente.
+    # Tipo de erro - filtra SO a secao "Reclamacoes de erro" (seus proprios
+    # KPIs, graficos e tabela), sem encolher total_msgs_cliente. Nao ha filtro
+    # separado de "categoria de erro" (erro_app/processo_publico) porque ela e'
+    # 100% derivada do tipo (ver pipeline/classify_suporte_local.py -
+    # _CATEGORIA_POR_TIPO) - filtrar por categoria seria redundante com tipo.
     reclamacoes_filtradas = msgs_filtradas[msgs_filtradas["is_issue"] == 1]
-    if categoria_erro:
-        reclamacoes_filtradas = reclamacoes_filtradas[reclamacoes_filtradas["issue_categoria"] == categoria_erro]
     if tipo_erro:
         reclamacoes_filtradas = reclamacoes_filtradas[reclamacoes_filtradas["issue_tipo"] == tipo_erro]
 

@@ -5,9 +5,10 @@ interface Props {
   options: string[];
   values: string[];
   onChange: (values: string[]) => void;
+  labels?: Record<string, string>;
 }
 
-export function MultiSelect({ label, options, values, onChange }: Props) {
+export function MultiSelect({ label, options, values, onChange, labels }: Props) {
   const toggle = (opt: string) => {
     if (values.includes(opt)) onChange(values.filter((v) => v !== opt));
     else onChange([...values, opt]);
@@ -25,7 +26,7 @@ export function MultiSelect({ label, options, values, onChange }: Props) {
               onChange={() => toggle(opt)}
               className="accent-[#2a78d6]"
             />
-            <span>{opt}</span>
+            <span>{labels?.[opt] ?? opt}</span>
           </label>
         ))}
       </div>

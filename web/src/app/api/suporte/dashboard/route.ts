@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
   appendParam(args, "--start", params.get("start"));
   appendParam(args, "--end", params.get("end"));
   appendParam(args, "--categoria", params.get("categoria"));
-  appendParam(args, "--categoria-erro", params.get("categoria_erro"));
   appendParam(args, "--tipo-erro", params.get("tipo_erro"));
 
   const data = await runPythonCli<SuporteDashboardOut>("suporte-dashboard", args);

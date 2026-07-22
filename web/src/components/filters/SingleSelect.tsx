@@ -6,9 +6,10 @@ interface Props {
   onChange: (value: string | undefined) => void;
   options: string[];
   sentinel: string;
+  labels?: Record<string, string>;
 }
 
-export function SingleSelect({ label, value, onChange, options, sentinel }: Props) {
+export function SingleSelect({ label, value, onChange, options, sentinel, labels }: Props) {
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="text-[#52514e]">{label}</span>
@@ -23,7 +24,7 @@ export function SingleSelect({ label, value, onChange, options, sentinel }: Prop
         <option value={sentinel}>{sentinel}</option>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {labels?.[o] ?? o}
           </option>
         ))}
       </select>

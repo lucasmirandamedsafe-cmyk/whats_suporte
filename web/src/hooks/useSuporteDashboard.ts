@@ -17,7 +17,6 @@ export function useSuporteDashboard(filters: SuporteFiltrosState) {
       start: filters.start,
       end: filters.end,
       categoria: filters.categoria,
-      categoria_erro: filters.categoriaErro,
       tipo_erro: filters.tipoErro,
     })
       .then((d) => {
@@ -35,7 +34,7 @@ export function useSuporteDashboard(filters: SuporteFiltrosState) {
     return () => {
       cancelled = true;
     };
-  }, [filters.start, filters.end, filters.categoria, filters.categoriaErro, filters.tipoErro]);
+  }, [filters.start, filters.end, filters.categoria, filters.tipoErro]);
 
   return { data, loading, error };
 }

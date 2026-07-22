@@ -7,7 +7,7 @@ pipeline/metrics.py e termina.
 Uso:
     python -m api.cli suporte-filtros
     python -m api.cli suporte-dashboard --start 2026-01-01 --end 2026-02-01 \
-        --categoria reclamacao --categoria-erro erro_app --tipo-erro acesso_login
+        --categoria reclamacao --tipo-erro acesso_login
     python -m api.cli grupos-filtros
     python -m api.cli grupos-dashboard --areas saude --areas educacao --start ... --end ...
 """
@@ -37,7 +37,6 @@ def main(argv: list[str] | None = None) -> None:
     p_suporte.add_argument("--start")
     p_suporte.add_argument("--end")
     p_suporte.add_argument("--categoria")
-    p_suporte.add_argument("--categoria-erro")
     p_suporte.add_argument("--tipo-erro")
 
     subparsers.add_parser("grupos-filtros")
@@ -56,7 +55,6 @@ def main(argv: list[str] | None = None) -> None:
             start=_parse_date(args.start),
             end=_parse_date(args.end),
             categoria=args.categoria or None,
-            categoria_erro=args.categoria_erro or None,
             tipo_erro=args.tipo_erro or None,
         )
     elif args.command == "grupos-filtros":

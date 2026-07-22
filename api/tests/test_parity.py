@@ -15,6 +15,7 @@ from pipeline.db import get_conn
 from pipeline.metrics import (
     kpis,
     kpis_grupos,
+    load_customer_messages,
     load_group_messages,
     load_sessions,
 )
@@ -51,9 +52,9 @@ def test_suporte_dashboard_filtrado_por_categoria_bate_com_pipeline_metrics():
 
 def test_suporte_filtro_erro_nao_encolhe_denominador():
     sem_filtro = suporte_dashboard()
-    com_filtro = suporte_dashboard(categoria_erro="erro_app", tipo_erro="acesso_login")
+    com_filtro = suporte_dashboard(tipo_erro="acesso_login")
 
-    # total_sessoes e total_mensagens_cliente nao mudam so por filtrar tipo/categoria de erro.
+    # total_sessoes e total_mensagens_cliente nao mudam so por filtrar tipo de erro.
     assert com_filtro["kpis"]["total_sessoes"] == sem_filtro["kpis"]["total_sessoes"]
     assert (
         com_filtro["kpis_reclamacao"]["total_mensagens_cliente"]
@@ -90,6 +91,29 @@ def test_grupos_dashboard_filtrado_por_area_bate_com_pipeline_metrics():
 
     assert kpis_api["total_mensagens"] == esperado["total_mensagens"]
     assert kpis_api["total_problemas"] == esperado["total_problemas"]
+
+
+def test_suporte_mensagens_da_categoria_nao_vazam_de_outras_sessoes():
+    """Regressao: total_mensagens_cliente/total_reclamacoes de um filtro de
+    categoria devem vir SO das sessoes com aquela categoria - nao de outras
+    sessoes do mesmo cliente (mesmo conversation_id) que caiam dentro da
+    janela de datas entre a primeira e a ultima sessao filtrada."""
+    with get_conn() as conn:
+        df = load_sessions(conn)
+        msgs = load_customer_messages(conn)
+
+    sessoes_elogio = df[df["categoria"] == "elogio"]
+    if sessoes_elogio.empty:
+        return  # nao ha dados suficientes pra este cenario nesta base
+
+    ids_elogio = set(sessoes_elogio["session_id"])
+    esperado_msgs = msgs[msgs["session_id"].isin(ids_elogio)]
+    esperado_reclamacoes = esperado_msgs[esperado_msgs["is_issue"] == 1]
+
+    resultado = suporte_dashboard(categoria="elogio")
+
+    assert resultado["kpis_reclamacao"]["total_mensagens_cliente"] == len(esperado_msgs)
+    assert resultado["kpis_reclamacao"]["total_reclamacoes"] == len(esperado_reclamacoes)
 
 
 def test_display_fields_never_drop_decimal():

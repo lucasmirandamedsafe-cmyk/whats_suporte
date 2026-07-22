@@ -15,7 +15,6 @@ from pipeline.db import get_conn
 from pipeline.metrics import (
     demandas_pouco_claras,
     distribuicao_categoria_grupos,
-    distribuicao_categoria_suporte,
     distribuicao_tipo_erro_grupos,
     distribuicao_tipo_suporte,
     kpis,
@@ -23,9 +22,10 @@ from pipeline.metrics import (
     load_customer_messages,
     load_group_messages,
     load_sessions,
+    media_atendimentos_por_hora,
     pico_simultaneos_por_periodo,
-    volume_por_dia,
-    volume_por_hora,
+    volume_atendimentos_por_periodo,
+    volume_por_dia_semana_hora,
     volume_problemas_por_area,
     volume_problemas_por_periodo,
 )
@@ -45,7 +45,6 @@ def suporte_filtros() -> dict:
             "min_date": None,
             "max_date": None,
             "categorias": [],
-            "categorias_erro": [],
             "tipos_erro": [],
         }
 
@@ -54,7 +53,6 @@ def suporte_filtros() -> dict:
         "min_date": df["started_at"].min().date().isoformat(),
         "max_date": df["started_at"].max().date().isoformat(),
         "categorias": sorted(df["categoria"].dropna().unique().tolist()),
-        "categorias_erro": sorted(msgs_cliente["issue_categoria"].dropna().unique().tolist()),
         "tipos_erro": sorted(msgs_cliente["issue_tipo"].dropna().unique().tolist()),
     }
 
@@ -63,7 +61,6 @@ def suporte_dashboard(
     start: date | None = None,
     end: date | None = None,
     categoria: str | None = None,
-    categoria_erro: str | None = None,
     tipo_erro: str | None = None,
 ) -> dict:
     with get_conn() as conn:
@@ -71,9 +68,7 @@ def suporte_dashboard(
         msgs_cliente = load_customer_messages(conn)
         clareza = demandas_pouco_claras(conn)
 
-    filtered = apply_suporte_filters(
-        df_sessions, msgs_cliente, clareza, start, end, categoria, categoria_erro, tipo_erro
-    )
+    filtered = apply_suporte_filters(df_sessions, msgs_cliente, clareza, start, end, categoria, tipo_erro)
     df = filtered["df"]
     msgs_filtradas = filtered["msgs_filtradas"]
     reclamacoes_filtradas = filtered["reclamacoes_filtradas"]
@@ -85,6 +80,8 @@ def suporte_dashboard(
         pico_serie = pico_simultaneos_por_periodo(df, "dia")["pico_simultaneos"]
         pico_atual = int(pico_serie.max()) if not pico_serie.empty else 0
 
+    media_por_hora = media_atendimentos_por_hora(df)
+
     k = kpis(df)
     tempo_medio = k["tempo_resposta_medio_min"]
 
@@ -94,7 +91,9 @@ def suporte_dashboard(
 
     tipo_erro_dist = distribuicao_tipo_suporte(reclamacoes_filtradas)
     if not tipo_erro_dist.empty:
-        tipo_erro_dist = tipo_erro_dist.sort_values("mensagens")
+        # Descendente: Recharts desenha a 1a linha do array no topo (diferente do
+        # Plotly, que desenha de baixo pra cima) - maior valor precisa vir primeiro.
+        tipo_erro_dist = tipo_erro_dist.sort_values("mensagens", ascending=False)
 
     return {
         "kpis": {
@@ -105,6 +104,8 @@ def suporte_dashboard(
             "pct_reclamacao": k["pct_reclamacao"],
             "pct_duvida": k["pct_duvida"],
             "pico_simultaneos": pico_atual,
+            "media_por_hora": media_por_hora,
+            "media_por_hora_display": f"{media_por_hora}",
             "pct_pouco_clara": pct_pouco_clara,
             "pct_pouco_clara_display": f"{pct_pouco_clara}%",
         },
@@ -114,14 +115,17 @@ def suporte_dashboard(
             "pct_reclamacoes": pct_reclamacoes,
             "pct_reclamacoes_display": f"{pct_reclamacoes}%",
         },
-        "volume_por_dia": df_to_records(volume_por_dia(df)),
-        "volume_por_hora": df_to_records(volume_por_hora(df)),
+        "volume_atendimentos": {
+            "dia": df_to_records(volume_atendimentos_por_periodo(df, "dia")),
+            "semana": df_to_records(volume_atendimentos_por_periodo(df, "semana")),
+            "mes": df_to_records(volume_atendimentos_por_periodo(df, "mes")),
+        },
+        "volume_por_dia_semana_hora": df_to_records(volume_por_dia_semana_hora(df)),
         "atendimentos_simultaneos": {
             "dia": df_to_records(pico_simultaneos_por_periodo(df, "dia")),
             "semana": df_to_records(pico_simultaneos_por_periodo(df, "semana")),
             "mes": df_to_records(pico_simultaneos_por_periodo(df, "mes")),
         },
-        "distribuicao_categoria_erro": df_to_records(distribuicao_categoria_suporte(reclamacoes_filtradas)),
         "distribuicao_tipo_erro": df_to_records(tipo_erro_dist),
         "mensagens_reclamacao": df_to_records(
             reclamacoes_filtradas[["timestamp", "conversation_id", "issue_categoria", "issue_tipo", "content"]]
@@ -182,7 +186,9 @@ def grupos_dashboard(
 
     tipo_erro_dist = distribuicao_tipo_erro_grupos(df)
     if not tipo_erro_dist.empty:
-        tipo_erro_dist = tipo_erro_dist.sort_values("incidentes")
+        # Descendente: Recharts desenha a 1a linha do array no topo (diferente do
+        # Plotly, que desenha de baixo pra cima) - maior valor precisa vir primeiro.
+        tipo_erro_dist = tipo_erro_dist.sort_values("incidentes", ascending=False)
 
     return {
         "is_empty": False,

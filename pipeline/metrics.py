@@ -62,11 +62,65 @@ def volume_por_dia(df: pd.DataFrame) -> pd.DataFrame:
     return out.groupby("dia").size().reset_index(name="conversas")
 
 
+def volume_atendimentos_por_periodo(df: pd.DataFrame, granularidade: str = "dia") -> pd.DataFrame:
+    """Como volume_por_dia, mas agregavel tambem por semana/mes - mesmo padrao
+    de pico_simultaneos_por_periodo/volume_problemas_por_periodo."""
+    out = df.dropna(subset=["started_at"]).copy()
+    if out.empty:
+        return out.assign(periodo=pd.Series(dtype="object"), conversas=pd.Series(dtype=int))
+    if granularidade == "semana":
+        out["periodo"] = out["started_at"].dt.to_period("W").dt.start_time.dt.date
+    elif granularidade == "mes":
+        out["periodo"] = out["started_at"].dt.to_period("M").dt.start_time.dt.date
+    else:
+        out["periodo"] = out["started_at"].dt.date
+    return out.groupby("periodo").size().reset_index(name="conversas")
+
+
 def volume_por_hora(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["hora"] = out["started_at"].dt.hour
     contagem = out.groupby("hora").size().reindex(range(24), fill_value=0)
     return contagem.rename_axis("hora").reset_index(name="conversas")
+
+
+# Dom=0 .. Sab=6 (pandas usa Seg=0..Dom=6 - ver _dia_semana_pt).
+_DIAS_SEMANA_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
+
+_FAIXA_FORA_HORARIO = "Fora do horário"
+
+# 06h-20h agrupado de 2 em 2 horas; fora disso (20h-06h) tudo em 1 faixa so.
+_FAIXAS_HORA_COMERCIAIS = [(6, 8), (8, 10), (10, 12), (12, 14), (14, 16), (16, 18), (18, 20)]
+_FAIXAS_HORA_ORDEM = [_FAIXA_FORA_HORARIO] + [f"{ini:02d}h–{fim:02d}h" for ini, fim in _FAIXAS_HORA_COMERCIAIS]
+
+
+def _dia_semana_pt(timestamp) -> str:
+    return _DIAS_SEMANA_PT[(timestamp.dayofweek + 1) % 7]
+
+
+def _faixa_hora(hora: int) -> str:
+    for inicio, fim in _FAIXAS_HORA_COMERCIAIS:
+        if inicio <= hora < fim:
+            return f"{inicio:02d}h–{fim:02d}h"
+    return _FAIXA_FORA_HORARIO
+
+
+def volume_por_dia_semana_hora(df: pd.DataFrame) -> pd.DataFrame:
+    """Heatmap de volume de atendimentos por dia da semana x faixa de horario -
+    06h-20h agrupado de 2 em 2 horas, fora disso (20h-06h) tudo em 1 faixa so.
+    Sempre devolve as 7x8 combinacoes (fill 0 onde nao houve atendimento)."""
+    out = df.dropna(subset=["started_at"]).copy()
+    if out.empty:
+        return pd.DataFrame(columns=["dia_semana", "faixa_hora", "conversas"])
+
+    out["dia_semana"] = out["started_at"].apply(_dia_semana_pt)
+    out["faixa_hora"] = out["started_at"].dt.hour.apply(_faixa_hora)
+
+    contagem = out.groupby(["dia_semana", "faixa_hora"]).size()
+    indice_completo = pd.MultiIndex.from_product(
+        [_DIAS_SEMANA_PT, _FAIXAS_HORA_ORDEM], names=["dia_semana", "faixa_hora"]
+    )
+    return contagem.reindex(indice_completo, fill_value=0).reset_index(name="conversas")
 
 
 def timeline_atendimentos_simultaneos(df: pd.DataFrame) -> pd.DataFrame:
@@ -102,6 +156,14 @@ def pico_simultaneos_por_periodo(df: pd.DataFrame, granularidade: str = "dia") -
         .max()
         .reset_index(name="pico_simultaneos")
     )
+
+
+def media_atendimentos_por_hora(df: pd.DataFrame) -> float:
+    """Media de atendimentos iniciados por hora do dia - total de atendimentos
+    dividido por 24 (mesma base da distribuicao usada em volume_por_hora)."""
+    if df.empty:
+        return 0.0
+    return round(len(df) / 24, 1)
 
 
 _PALAVRAS_PROBLEMA = [
@@ -143,7 +205,8 @@ def demandas_pouco_claras(conn) -> pd.DataFrame:
       de demanda confusa)
     - suporte precisou dizer explicitamente que nao entendeu / pedir pra detalhar melhor
     Um atendimento marcado assim nao significa necessariamente demanda ruim, so que
-    faltou detalhe de cara - vale conferir manualmente os casos limitrofes."""
+    faltou detalhe de cara - vale conferir manualmente os casos limitrofes.
+    Ver docs/demanda-pouco-clara.md para a explicacao completa da regra."""
     rows = conn.execute(
         "SELECT session_id, timestamp, is_support, content FROM messages "
         "WHERE is_media = 0 ORDER BY session_id, timestamp"
