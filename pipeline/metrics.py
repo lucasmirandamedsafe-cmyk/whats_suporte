@@ -305,11 +305,6 @@ def ranking_temas(df: pd.DataFrame, top_n=8) -> pd.DataFrame:
     return counts
 
 
-def distribuicao_sentimento(df: pd.DataFrame) -> pd.DataFrame:
-    counts = df["sentimento"].value_counts().reindex(["positivo", "neutro", "negativo"], fill_value=0)
-    return counts.rename_axis("sentimento").reset_index(name="conversas")
-
-
 def load_group_messages(conn) -> pd.DataFrame:
     return pd.read_sql_query(
         "SELECT * FROM group_messages WHERE is_media = 0", conn, parse_dates=["timestamp", "analyzed_at"]

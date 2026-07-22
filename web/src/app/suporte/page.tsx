@@ -19,7 +19,7 @@ import { DataTable } from "@/components/tables/DataTable";
 import { useSuporteDashboard } from "@/hooks/useSuporteDashboard";
 import { useSuporteFiltros } from "@/hooks/useSuporteFiltros";
 import { formatDateTime, formatSeconds } from "@/lib/formatters";
-import { CATEGORIA_ATENDIMENTO_LABELS, CATEGORIA_ERRO_LABELS, TIPO_ERRO_LABELS, translateLabel } from "@/lib/labels";
+import { CATEGORIA_ATENDIMENTO_LABELS, TIPO_ERRO_LABELS, translateLabel } from "@/lib/labels";
 import type { Granularidade, PeriodoConversas, PeriodoMensagens, SuporteFiltrosState } from "@/lib/types";
 
 // Mesma ordem canonica de pipeline/metrics.py::volume_por_dia_semana_hora
@@ -274,11 +274,6 @@ export default function SuportePage() {
               columns={[
                 { key: "timestamp", header: "Data/hora", render: (v) => formatDateTime(v as string) },
                 { key: "conversation_id", header: "Conversa" },
-                {
-                  key: "issue_categoria",
-                  header: "Categoria de erro",
-                  render: (v) => translateLabel(v as string | null, CATEGORIA_ERRO_LABELS),
-                },
                 {
                   key: "issue_tipo",
                   header: "Tipo de erro",

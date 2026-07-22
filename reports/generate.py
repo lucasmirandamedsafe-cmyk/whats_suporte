@@ -19,7 +19,6 @@ from api.filters import apply_suporte_filters
 from pipeline.db import get_conn
 from pipeline.metrics import (
     demandas_pouco_claras,
-    distribuicao_sentimento,
     distribuicao_tipo_suporte,
     kpis,
     load_all_messages,
@@ -46,8 +45,6 @@ _LARANJA = (235, 104, 52)
 _ROXO = (74, 58, 167)
 _VERMELHO = (227, 73, 72)
 _CATEGORICAL = [_AZUL, _VERDE, _ROSA, _AMBAR, _VERDE_AGUA, _LARANJA, _ROXO, _VERMELHO]
-
-_STATUS = {"positivo": (12, 163, 12), "neutro": (137, 135, 129), "negativo": (208, 59, 59)}
 
 _INK_PRIMARY = (11, 11, 11)
 _INK_SECONDARY = (82, 81, 78)
@@ -337,15 +334,6 @@ def build_suporte_report(
         for i, (_, row) in enumerate(temas.iterrows()):
             tema = row["tema"] if row["tema"] else "sem tema classificado"
             pdf.barra_horizontal(str(tema), int(row["conversas"]), maximo_tema, indice=i, color=_ROXO)
-
-    # --- Sentimento ---
-    pdf.section("Sentimento dos atendimentos", color=_LARANJA)
-    sent = distribuicao_sentimento(df)
-    pdf.kpi_grid(
-        [(row["sentimento"].capitalize(), f"{row['conversas']} atendimento(s)", _STATUS[row["sentimento"]])
-         for _, row in sent.iterrows()],
-        cols=3,
-    )
 
     # --- Reclamacoes com maior tempo de resposta ---
     destaque = df[df["categoria"] == "reclamacao"].sort_values("first_response_seconds", ascending=False).head(10)

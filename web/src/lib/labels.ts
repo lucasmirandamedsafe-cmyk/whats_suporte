@@ -32,12 +32,6 @@ export const AREA_LABELS: Record<string, string> = {
   assistencia: "Assistência",
 };
 
-export const SENTIMENTO_LABELS: Record<string, string> = {
-  positivo: "Positivo",
-  neutro: "Neutro",
-  negativo: "Negativo",
-};
-
 /** Traduz um valor via dicionario; se nao encontrar, devolve o valor original. */
 export function translateLabel(value: string | null | undefined, dict: Record<string, string>): string {
   if (value === null || value === undefined) return "—";
