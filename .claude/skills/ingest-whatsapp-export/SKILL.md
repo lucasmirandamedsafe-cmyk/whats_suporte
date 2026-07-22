@@ -89,16 +89,9 @@ vetorizacao on-the-fly mais lenta).
 
 - `python pipeline/search_messages.py "<algum termo esperado>" --top 5` - confirma que
   as mensagens novas aparecem.
-- Rode a pagina do dashboard afetada direto (fora do Streamlit) pra pegar erro de import
-  cedo, ja que `curl` no app rodando NAO executa o script da pagina (SPA com roteamento
-  client-side - so serve o shell HTML):
-  ```
-  python -c "import runpy; runpy.run_path('dashboard/pages/1_Grupos.py', run_name='__main__')"
-  ```
-- Reinicie o Streamlit com cache limpo antes de considerar concluido (o processo antigo
-  mantem modulos Python em memoria - editar arquivo sozinho NAO garante reload):
-  ```
-  # matar o processo antigo (ache o PID escutando 8501), depois:
-  find . -iname "__pycache__" -exec rm -rf {} +
-  streamlit run dashboard/app.py --server.headless true --server.port 8501
-  ```
+- `python -m pytest api/tests/` - confere que `api/dashboard_data.py` ainda bate com
+  `pipeline/metrics.py` (nao deveria mudar por causa de ingest, mas pega erro de import
+  cedo).
+- O dashboard (`cd web && npm run dev`) chama Python sob demanda a cada requisicao (sem
+  processo de longa duracao, sem cache) - so abrir/atualizar a pagina ja mostra os dados
+  novos, sem precisar reiniciar nada.

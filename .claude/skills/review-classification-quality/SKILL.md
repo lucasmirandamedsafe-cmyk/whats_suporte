@@ -67,8 +67,9 @@ esta errado, nao aparece, nao aceita, esta invalido, etc. - mesmo curta ("Não s
    por categoria/tipo antes vs. depois da revisao, igual ao formato que ja usamos
    nessa conversa (tabela markdown com "Antes" / "Agora").
 
-7. **Reiniciar o Streamlit com cache limpo** antes de considerar concluido - ver a
-   skill `ingest-whatsapp-export`, secao 6, pros comandos exatos.
+7. **Conferir o dashboard** - ver a skill `ingest-whatsapp-export`, secao 6. O dashboard
+   Next.js (`cd web && npm run dev`) chama Python sob demanda a cada requisicao, sem
+   cache nem processo de longa duracao - basta atualizar a pagina.
 
 ## Se a Groq estiver rate-limited e voce precisar classificar do zero
 

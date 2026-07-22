@@ -2,8 +2,7 @@ groq
 google-genai
 pandas
 numpy
-streamlit
-plotly
 python-dotenv
 fpdf2
 playwright
+pytest
