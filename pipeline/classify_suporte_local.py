@@ -26,29 +26,37 @@ _TIPO_KEYWORDS = {
     "acesso_login": [
         "senha invalida", "senha errada", "usuario invalido", "usuario ou senha",
         "esqueci a senha", "esqueci minha senha", "resetar a senha", "reset de senha",
+        "redefinir a senha", "redefinir minha senha", "nao consigo redefinir",
         "nao consigo entrar", "nao entra", "nao consigo acessar", "nao consigo logar",
         "bloqueado", "acesso bloqueado", "nao abre o app", "nao abre a plataforma",
-        "conta bloqueada",
+        "conta bloqueada", "usuario nao existente", "usuario nao autorizado",
     ],
     "cadastro_dados": [
         "cadastro errado", "cadastrado errado", "dado errado", "dados errados",
         "cpf errado", "cpf invalido", "nao aceita o cpf", "nao aceita cpf",
         "nao consigo cadastrar", "erro no cadastro", "erro ao cadastrar",
         "nao consigo inserir", "nao consigo adicionar a familia",
+        "nao consigo finalizar o cadastro", "nao consigo adicionar",
+        "cadastro duplicado", "ja esta cadastrado", "nao consigo duplicar o cadastro",
     ],
     "visitas_acompanhamento": [
         "questionario nao salva", "formulario nao salva", "nao consigo preencher",
         "visita nao aparece", "nao consigo aplicar o questionario",
-        "nao consigo fazer a visita", "plano de visita nao",
+        "nao consigo fazer a visita", "plano de visita nao", "plano de caracterizacao",
     ],
     "cursos_certificados": [
         "nao consigo emitir", "certificado nao aparece", "nao emite o certificado",
         "erro ao emitir certificado", "curso nao aparece", "nao consta o curso",
+        "nao consigo concluir o curso", "nao consigo concluir", "nao consigo terminar o curso",
+        "nao consigo fazer o curso", "nao consigo gerar o certificado", "nao abre o curso",
+        "capacitacao nao aparece",
     ],
-    "processo_administrativo": [
+    "vinculos_aprovacoes": [
         "nao consigo aprovar", "nao aprova", "nao consigo excluir", "nao consigo vincular",
         "nao consigo desvincular", "unidade errada", "mais de uma unidade",
-        "mais de um perfil", "nao vincula ao cras",
+        "mais de um perfil", "nao vincula ao cras", "opcao de aprovar", "para aprovar nao aparece",
+        "nao aparece para aceitar", "nao aparece para eu aceitar", "municipio errado",
+        "nao pertence a esse municipio",
     ],
     "instabilidade_plataforma": [
         "nao funciona", "nao esta funcionando", "nao ta funcionando", "caiu",
@@ -58,7 +66,7 @@ _TIPO_KEYWORDS = {
     ],
 }
 _CATEGORIA_POR_TIPO = {
-    "processo_administrativo": "processo_publico",
+    "vinculos_aprovacoes": "processo_publico",
 }
 _PROBLEMA_GERAL = [
     "nao consigo", "nao aparece", "nao encontro", "sumiu", "sumiram",

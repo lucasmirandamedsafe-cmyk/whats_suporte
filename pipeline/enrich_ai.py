@@ -79,6 +79,8 @@ def summarize_with_gemini(client, transcript):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     groq_client = Groq(api_key=config.GROQ_API_KEY) if config.GROQ_API_KEY else None
     if not groq_client:
         print("GROQ_API_KEY não definida - categoria/tema/sentimento serão pulados.")

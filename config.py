@@ -17,7 +17,9 @@ SUPPORT_SENDER_NAMES = [
 ]
 
 # Gap (em horas) sem mensagens que marca o início de um novo atendimento/sessão
-# dentro da mesma conversa.
+# dentro da mesma conversa. Validado empiricamente contra a distribuição real
+# de intervalos entre mensagens - ver docs/session-gap-6h-analise.md e
+# pipeline/verificar_gap_sessoes.py (reexecutável se o padrão de uso mudar).
 SESSION_GAP_HOURS = 6
 
 # Groq classifica categoria/tema/sentimento (barato e rápido, roda em lote)

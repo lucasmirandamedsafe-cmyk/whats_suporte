@@ -13,7 +13,6 @@ from pipeline.metrics import (
     distribuicao_categoria_suporte,
     distribuicao_tipo_suporte,
     kpis,
-    kpis_reclamacao_suporte,
     load_customer_messages,
     load_sessions,
     pico_simultaneos_por_periodo,
@@ -48,6 +47,7 @@ def get_mensagens_cliente():
 
 
 df = get_data()
+msgs_cliente = get_mensagens_cliente()
 
 st.title("Suporte WhatsApp")
 
@@ -60,22 +60,46 @@ with st.sidebar:
     min_date, max_date = df["started_at"].min().date(), df["started_at"].max().date()
     date_range = st.date_input("Período", (min_date, max_date), min_value=min_date, max_value=max_date)
 
+    categorias_disponiveis = sorted(df["categoria"].dropna().unique().tolist())
+    categoria_selecionada = st.selectbox("Categoria do atendimento", ["Todas"] + categorias_disponiveis)
+
+    categorias_erro_disponiveis = sorted(msgs_cliente["issue_categoria"].dropna().unique().tolist())
+    categoria_erro_selecionada = st.selectbox("Categoria de erro", ["Todas"] + categorias_erro_disponiveis)
+
+    tipos_erro_disponiveis = sorted(msgs_cliente["issue_tipo"].dropna().unique().tolist())
+    tipo_erro_selecionado = st.selectbox("Tipo de erro", ["Todos"] + tipos_erro_disponiveis)
+
 if isinstance(date_range, tuple) and len(date_range) == 2:
     start, end = date_range
     df = df[(df["started_at"].dt.date >= start) & (df["started_at"].dt.date <= end)]
+
+if categoria_selecionada != "Todas":
+    df = df[df["categoria"] == categoria_selecionada]
 
 clareza = get_clareza()
 clareza_filtrada = clareza[clareza["session_id"].isin(df["session_id"])]
 pct_pouco_clara = round(clareza_filtrada["demanda_pouco_clara"].mean() * 100, 1) if not clareza_filtrada.empty else 0
 
-msgs_cliente = get_mensagens_cliente()
 conversas_no_filtro = set(df["conversation_id"])
 msgs_filtradas = msgs_cliente[
     msgs_cliente["conversation_id"].isin(conversas_no_filtro)
     & (msgs_cliente["timestamp"].dt.date >= df["started_at"].min().date())
     & (msgs_cliente["timestamp"].dt.date <= df["started_at"].max().date())
 ] if not df.empty else msgs_cliente.iloc[0:0]
-k_reclamacao = kpis_reclamacao_suporte(msgs_filtradas)
+
+reclamacoes_filtradas = msgs_filtradas[msgs_filtradas["is_issue"] == 1]
+if categoria_erro_selecionada != "Todas":
+    reclamacoes_filtradas = reclamacoes_filtradas[reclamacoes_filtradas["issue_categoria"] == categoria_erro_selecionada]
+if tipo_erro_selecionado != "Todos":
+    reclamacoes_filtradas = reclamacoes_filtradas[reclamacoes_filtradas["issue_tipo"] == tipo_erro_selecionado]
+
+total_msgs_cliente = len(msgs_filtradas)
+total_reclamacoes_filtradas = len(reclamacoes_filtradas)
+k_reclamacao = {
+    "total_mensagens_cliente": total_msgs_cliente,
+    "total_reclamacoes": total_reclamacoes_filtradas,
+    "pct_reclamacoes": round(total_reclamacoes_filtradas / total_msgs_cliente * 100, 1) if total_msgs_cliente else 0,
+}
 
 if df.empty:
     pico_atual = 0
@@ -150,7 +174,7 @@ col3, col4 = st.columns(2)
 
 with col3:
     st.subheader("Distribuição por categoria")
-    cat = distribuicao_categoria_suporte(msgs_filtradas)
+    cat = distribuicao_categoria_suporte(reclamacoes_filtradas)
     if cat.empty:
         st.info("Nenhuma reclamação no período selecionado.")
     else:
@@ -168,7 +192,7 @@ with col3:
 
 with col4:
     st.subheader("Tipo de erro")
-    tipo = distribuicao_tipo_suporte(msgs_filtradas)
+    tipo = distribuicao_tipo_suporte(reclamacoes_filtradas)
     if tipo.empty:
         st.info("Nenhuma reclamação no período selecionado.")
     else:
@@ -187,25 +211,9 @@ with col4:
         st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Mensagens com reclamação/erro")
-reclamacoes = msgs_filtradas[msgs_filtradas["is_issue"] == 1]
 st.dataframe(
-    reclamacoes[["timestamp", "conversation_id", "issue_categoria", "issue_tipo", "content"]]
+    reclamacoes_filtradas[["timestamp", "conversation_id", "issue_categoria", "issue_tipo", "content"]]
     .sort_values("timestamp", ascending=False),
-    use_container_width=True,
-    hide_index=True,
-)
-
-st.divider()
-st.subheader("Demandas pouco claras")
-st.caption(
-    "Atendimentos cuja mensagem inicial do cliente (antes da 1ª resposta do suporte) veio "
-    "curta/sem detalhe do problema, ou em que o suporte precisou dizer que não entendeu."
-)
-pouco_claras = df.merge(clareza_filtrada[["session_id", "mensagem_inicial", "demanda_pouco_clara"]], on="session_id")
-pouco_claras = pouco_claras[pouco_claras["demanda_pouco_clara"]]
-st.dataframe(
-    pouco_claras[["started_at", "conversation_id", "mensagem_inicial", "first_response_seconds"]]
-    .sort_values("started_at", ascending=False),
     use_container_width=True,
     hide_index=True,
 )

@@ -17,7 +17,7 @@ TIPOS_ERRO = [
     "acesso_login",
     "visitas_acompanhamento",
     "cursos_certificados",
-    "processo_administrativo",
+    "vinculos_aprovacoes",
     "instabilidade_plataforma",
     "outro",
 ]
@@ -27,7 +27,7 @@ DESCRICAO_TIPOS = (
     "acesso_login: nao consegue entrar, senha, tela nao aparece, conexao\n"
     "visitas_acompanhamento: visita, formulario, acompanhamento de criancas/gestantes\n"
     "cursos_certificados: cursos, certificados, capacitacao\n"
-    "processo_administrativo: vinculacao de CNPJ/CRAS, aprovacao, exclusao de usuario, requisitos, orientacao\n"
+    "vinculos_aprovacoes: vinculacao de CNPJ/CRAS, aprovacao, exclusao de usuario, requisitos, orientacao\n"
     "instabilidade_plataforma: plataforma/app nao funciona, erro de atualizacao/visualizacao/localizacao, erro desconhecido\n"
     "outro: qualquer coisa que nao se encaixe bem nas anteriores"
 )
